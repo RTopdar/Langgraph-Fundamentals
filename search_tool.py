@@ -340,25 +340,18 @@ if __name__ == "__main__":
     # Test basic web search
     request = SearchRequest(q="Python async programming", count=5)
     response = search_web(request)
-    print(f"\nWeb Search - Query: {response.query}")
-    print(f"Results: {response.count}\n")
+    logger.info("Web search test", query=response.query, result_count=response.count)
     for result in response.results:
-        print(f"Title: {result.title}")
-        print(f"URL: {result.url}")
-        print(f"Description: {result.description}\n")
+        logger.info("Result", title=result.title, url=result.url)
 
     # Test news search
-    print("\n--- News Search (AI News, Past Week) ---")
+    logger.info("News search test started")
     request = NewsSearchRequest(
         q="artificial intelligence",
         freshness="pw",
         count=5
     )
     response = search_news(request)
-    print(f"Query: {response.query}")
-    print(f"Results: {response.count}\n")
+    logger.info("News search complete", query=response.query, result_count=response.count)
     for result in response.results:
-        print(f"Title: {result.title}")
-        print(f"Source: {result.source}")
-        print(f"URL: {result.url}")
-        print()
+        logger.info("News result", title=result.title, source=result.source, url=result.url)

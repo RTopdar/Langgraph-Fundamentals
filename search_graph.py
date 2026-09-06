@@ -237,46 +237,41 @@ logger.info("Search graph compiled successfully")
 
 
 if __name__ == "__main__":
-    print("\n" + "="*80)
-    print("LangGraph Search Agent with Brave Search Tool")
-    print("="*80 + "\n")
+    logger.info("Starting search graph tests")
 
     # Test 1: Simple search query
-    print("Test 1: Simple Search Query")
-    print("-" * 40)
+    logger.info("Test 1: Simple Search Query")
     user_query = "What are the latest developments in LLM reasoning?"
-    print(f"Query: {user_query}\n")
+    logger.info("Query", query=user_query)
 
     result = graph.invoke({"messages": [("user", user_query)]})
     final_message = result["messages"][-1]
 
     if hasattr(final_message, "content"):
-        print(f"Agent Response:\n{final_message.content}\n")
+        logger.info("Agent response received", response_length=len(final_message.content))
 
     # Test 2: Search with specific parameters
-    print("\nTest 2: Filtered Search (Recent Results)")
-    print("-" * 40)
+    logger.info("Test 2: Filtered Search (Recent Results)")
     user_query = "Tell me about quantum computing breakthroughs this week"
-    print(f"Query: {user_query}\n")
+    logger.info("Query", query=user_query)
 
     result = graph.invoke({"messages": [("user", user_query)]})
     final_message = result["messages"][-1]
 
     if hasattr(final_message, "content"):
-        print(f"Agent Response:\n{final_message.content}\n")
+        logger.info("Agent response received", response_length=len(final_message.content))
 
     # Test 3: Multi-turn conversation
-    print("\nTest 3: Multi-turn Conversation")
-    print("-" * 40)
+    logger.info("Test 3: Multi-turn Conversation")
     messages = [
         ("user", "Search for Python async programming best practices"),
         ("assistant", "I'll search for Python async programming best practices for you."),
     ]
 
-    print("Initial query: Search for Python async programming best practices\n")
+    logger.info("Starting multi-turn conversation")
     result = graph.invoke({"messages": messages})
 
     if result["messages"]:
         final_message = result["messages"][-1]
         if hasattr(final_message, "content"):
-            print(f"Agent Response:\n{final_message.content}\n")
+            logger.info("Multi-turn conversation complete", response_length=len(final_message.content))
