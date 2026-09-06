@@ -1,0 +1,15 @@
+[project]
+name = "langgraph-learn"
+version = "0.1.0"
+description = "Add your description here"
+readme = "README.md"
+requires-python = ">=3.13"
+dependencies = [
+    "black>=26.5.1",
+    "ipython>=9.17.1",
+    "langchain-openrouter>=0.2.8",
+    "langgraph>=1.2.11",
+    "langgraph-cli>=0.4.31",
+    "pydantic-settings>=2.15.0",
+    "structlog>=26.1.0",
+]

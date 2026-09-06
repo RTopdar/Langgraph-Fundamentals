@@ -11,7 +11,9 @@ from langgraph.graph import StateGraph, START, END
 from langgraph.graph.message import add_messages
 from langgraph.prebuilt import ToolNode
 from langchain_core.tools import tool
+from langchain_core.messages import SystemMessage
 import json
+from datetime import datetime
 
 from model_config import get_model
 from logging_config import setup_logging, get_logger
@@ -21,6 +23,10 @@ setup_logging()
 logger = get_logger(__name__)
 
 model = get_model()
+
+# Get current date for context
+CURRENT_DATE = datetime.now().strftime("%B %d, %Y")
+CURRENT_YEAR = datetime.now().year
 
 
 class State(TypedDict):
@@ -168,6 +174,30 @@ def should_search(state: State) -> str:
 def agent(state: State):
     """Main agent node that processes messages and decides to search or respond"""
     messages = state["messages"]
+
+    # Inject date context if not already present
+    system_context = f"""You are a helpful search assistant with access to web search and news search tools.
+
+IMPORTANT CONTEXT:
+- Today's date: {CURRENT_DATE}
+- Current year: {CURRENT_YEAR}
+
+When users ask for recent/latest/this week/this month information:
+- "this week" → use freshness='pw' (past week)
+- "this month" → use freshness='pm' (past month)
+- "this year" or recent → use freshness='py' (past year)
+- "today" or "this week" → use freshness='pd' (past day)
+
+Always use these exact freshness values: 'pd' (past day), 'pw' (past week), 'pm' (past month), 'py' (past year).
+
+When you infer dates in queries, use {CURRENT_YEAR} as the current year. Never assume old years.
+Use the appropriate search tool:
+- Use 'web_search' for general information, research, articles, documentation
+- Use 'news_search' for current events, breaking news, recent developments"""
+
+    # Check if first message is user message (not system message)
+    if messages and not isinstance(messages[0], dict) or (isinstance(messages[0], dict) and messages[0].get("type") != "system"):
+        messages = [{"type": "system", "content": system_context}] + messages
 
     # Bind tools to model
     model_with_tools = model.bind_tools(tools)

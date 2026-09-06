@@ -14,51 +14,41 @@ from logging_config import get_logger
 logger = get_logger(__name__)
 
 
-class SearchRequest(BaseModel):
-    """
-    Complete search request model for Brave Search Web API.
-
-    Supports all available Brave Search parameters with full type validation
-    and descriptions for LLM tool understanding.
-    """
+class BaseSearchRequest(BaseModel):
+    """Base search request with common parameters for both web and news search"""
 
     q: str = Field(
         ...,
-        description="The user's search query term. Cannot be empty. Max 400 characters and 50 words."
+        description="Search query term. Cannot be empty. Max 400 characters and 50 words."
     )
 
     country: Optional[str] = Field(
         default="US",
-        description="Geographic region for results using 2-letter country codes (e.g., US, GB, AU, CA, etc.). Defaults to US."
+        description="Geographic region using 2-letter country codes (e.g., US, GB, AU, CA, etc.). Defaults to US."
     )
 
     search_lang: Optional[str] = Field(
         default="en",
-        description="Language code for search results (2+ characters, e.g., 'en', 'es', 'fr', 'de'). Defaults to English."
+        description="Language code for results (2+ characters, e.g., 'en', 'es', 'fr', 'de'). Defaults to English."
     )
 
     ui_lang: Optional[str] = Field(
         default="en-US",
-        description="User interface language in format language-country (e.g., 'en-US', 'es-ES', 'fr-CA'). Defaults to English-US."
+        description="UI language in format language-country (e.g., 'en-US', 'es-ES', 'fr-CA'). Defaults to English-US."
     )
 
     count: Optional[int] = Field(
         default=20,
         ge=1,
         le=20,
-        description="Number of results to return per request (1-20). Defaults to 20."
+        description="Number of results to return (1-20). Defaults to 20."
     )
 
     offset: Optional[int] = Field(
         default=0,
         ge=0,
         le=9,
-        description="Zero-based offset for pagination (0-9 pages). Use to skip result pages. Defaults to 0."
-    )
-
-    safesearch: Optional[Literal["off", "moderate", "strict"]] = Field(
-        default="moderate",
-        description="Content filtering level: 'off' (no filtering), 'moderate' (default), or 'strict' (maximum filtering)."
+        description="Zero-based pagination offset (0-9 pages). Defaults to 0."
     )
 
     spellcheck: Optional[bool] = Field(
@@ -66,14 +56,28 @@ class SearchRequest(BaseModel):
         description="Enable automatic query spelling correction. Defaults to True."
     )
 
-    freshness: Optional[Literal["pd", "pw", "pm", "py"]] = Field(
-        default=None,
-        description="Filter by page age: 'pd' (past day), 'pw' (past week), 'pm' (past month), 'py' (past year). Leave empty for no age filter."
-    )
-
     text_decorations: Optional[bool] = Field(
         default=True,
-        description="Include highlighting markers (bold/italic) in display strings. Defaults to True."
+        description="Include highlighting markers in display strings. Defaults to True."
+    )
+
+    freshness: Optional[Literal["pd", "pw", "pm", "py"]] = Field(
+        default=None,
+        description="Filter by age. MUST be one of: 'pd' (past day), 'pw' (past week), 'pm' (past month), 'py' (past year). Invalid values rejected."
+    )
+
+
+class SearchRequest(BaseSearchRequest):
+    """
+    Complete search request model for Brave Search Web API.
+
+    Supports all available Brave Search parameters with full type validation
+    and descriptions for LLM tool understanding.
+    """
+
+    safesearch: Optional[Literal["off", "moderate", "strict"]] = Field(
+        default="moderate",
+        description="Content filtering level: 'off', 'moderate' (default), or 'strict'."
     )
 
     result_filter: Optional[str] = Field(
@@ -136,60 +140,17 @@ class SearchResponse(BaseModel):
     took_ms: Optional[int] = None
 
 
-class NewsSearchRequest(BaseModel):
+class NewsSearchRequest(BaseSearchRequest):
     """
     News search request model for Brave Search News API.
 
-    Supports news-specific filtering with all available Brave Search News parameters.
+    Inherits common search parameters from BaseSearchRequest.
+    News-specific defaults: freshness defaults to 'pw' (past week) for relevance.
     """
-
-    q: str = Field(
-        ...,
-        description="The user's news search query. Cannot be empty. Max 400 characters and 50 words."
-    )
-
-    country: Optional[str] = Field(
-        default="US",
-        description="Geographic region for news results using 2-letter country codes (e.g., US, GB, AU). Defaults to US."
-    )
-
-    search_lang: Optional[str] = Field(
-        default="en",
-        description="Language code for news results (2+ characters, e.g., 'en', 'es', 'fr'). Defaults to English."
-    )
-
-    ui_lang: Optional[str] = Field(
-        default="en-US",
-        description="User interface language in format language-country (e.g., 'en-US', 'es-ES'). Defaults to English-US."
-    )
-
-    count: Optional[int] = Field(
-        default=20,
-        ge=1,
-        le=20,
-        description="Number of news results to return (1-20). Defaults to 20."
-    )
-
-    offset: Optional[int] = Field(
-        default=0,
-        ge=0,
-        le=9,
-        description="Zero-based offset for pagination (0-9 pages). Defaults to 0."
-    )
 
     freshness: Optional[Literal["pd", "pw", "pm", "py"]] = Field(
         default="pw",
-        description="Filter by news age: 'pd' (past day), 'pw' (past week, default), 'pm' (past month), 'py' (past year)."
-    )
-
-    text_decorations: Optional[bool] = Field(
-        default=True,
-        description="Include highlighting markers in display strings. Defaults to True."
-    )
-
-    spellcheck: Optional[bool] = Field(
-        default=True,
-        description="Enable automatic query spelling correction. Defaults to True."
+        description="Filter by news age. MUST be one of: 'pd' (past day), 'pw' (past week, default), 'pm' (past month), 'py' (past year)."
     )
 
 
