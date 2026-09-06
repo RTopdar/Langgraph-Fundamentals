@@ -51,12 +51,17 @@ result = graph.invoke({"messages": "What is the capital of France?"})
 
 logger.info("graph invocation complete", result=result)
 
-logger.info("Model Used", model=str(result["messages"][-1].response_metadata["model_name"]))
+logger.info(
+    "Model Used", model=str(result["messages"][-1].response_metadata["model_name"])
+)
 
 
-for event in graph.stream({"messages": "My life has been a living chaos recently where I am always confused and nothing makes sense"}):
+for event in graph.stream(
+    {
+        "messages": "My life has been a living chaos recently where I am always confused and nothing makes sense"
+    }
+):
     node_name = list(event.keys())[0] if event else None
-    logger.info("stream event", node=node_name, output=event[node_name] if node_name else None)
-
-
-
+    logger.info(
+        "stream event", node=node_name, output=event[node_name] if node_name else None
+    )

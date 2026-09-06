@@ -7,7 +7,7 @@ class Settings(BaseSettings):
 
     # LLM Configuration
     openrouter_api_key: str
-    openrouter_model: str = "openai/gpt-4-turbo"
+    openrouter_model: str = "openrouter/free"
 
     # LangChain Configuration
     langchain_api_key: Optional[str] = None
@@ -15,6 +15,10 @@ class Settings(BaseSettings):
 
     # Brave Search Configuration
     brave_search_api_key: Optional[str] = None
+
+    # LangSmith Configuration
+    langsmith_api_key: Optional[str] = None
+    langsmith_project: str = "langgraph-learn"
 
     # Application
     log_level: str = "INFO"

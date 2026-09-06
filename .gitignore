@@ -12,3 +12,6 @@ wheels/
 # Environment variables
 .env
 .env.local
+
+# LangGraph dev server cache
+.langgraph_api/

@@ -1,3 +1,4 @@
+import os
 from settings import Settings
 from logging_config import setup_logging, get_logger
 
@@ -6,6 +7,12 @@ def main():
     settings = Settings()
     setup_logging(settings.log_level)
     logger = get_logger(__name__)
+
+    # Configure LangSmith for LangGraph dev
+    if settings.langsmith_api_key:
+        os.environ["LANGSMITH_API_KEY"] = settings.langsmith_api_key
+        os.environ["LANGCHAIN_TRACING_V2"] = "true"
+        os.environ["LANGCHAIN_PROJECT"] = "langgraph-learn"
 
     logger.info("Starting application", app_name=settings.app_name)
     logger.info("LLM configured", model=settings.openrouter_model)

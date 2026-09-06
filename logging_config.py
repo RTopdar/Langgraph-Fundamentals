@@ -1,5 +1,14 @@
 import sys
 import structlog
+import json
+
+
+def format_json_fields(logger, name, event_dict):
+    """Format dict values as pretty-printed JSON for readability"""
+    for key, value in event_dict.items():
+        if isinstance(value, (dict, list)):
+            event_dict[key] = "\n" + json.dumps(value, indent=2)
+    return event_dict
 
 
 def setup_logging(log_level: str = "INFO") -> None:
@@ -15,6 +24,7 @@ def setup_logging(log_level: str = "INFO") -> None:
             structlog.processors.StackInfoRenderer(),
             structlog.processors.format_exc_info,
             structlog.processors.UnicodeDecoder(),
+            format_json_fields,
             structlog.dev.ConsoleRenderer(colors=True),
         ],
         context_class=dict,

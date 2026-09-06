@@ -19,51 +19,51 @@ class BaseSearchRequest(BaseModel):
 
     q: str = Field(
         ...,
-        description="Search query term. Cannot be empty. Max 400 characters and 50 words."
+        description="Search query term. Cannot be empty. Max 400 characters and 50 words.",
     )
 
     country: Optional[str] = Field(
         default="US",
-        description="Geographic region using 2-letter country codes (e.g., US, GB, AU, CA, etc.). Defaults to US."
+        description="Geographic region using 2-letter country codes (e.g., US, GB, AU, CA, etc.). Defaults to US.",
     )
 
     search_lang: Optional[str] = Field(
         default="en",
-        description="Language code for results (2+ characters, e.g., 'en', 'es', 'fr', 'de'). Defaults to English."
+        description="Language code for results (2+ characters, e.g., 'en', 'es', 'fr', 'de'). Defaults to English.",
     )
 
     ui_lang: Optional[str] = Field(
         default="en-US",
-        description="UI language in format language-country (e.g., 'en-US', 'es-ES', 'fr-CA'). Defaults to English-US."
+        description="UI language in format language-country (e.g., 'en-US', 'es-ES', 'fr-CA'). Defaults to English-US.",
     )
 
     count: Optional[int] = Field(
         default=20,
         ge=1,
         le=20,
-        description="Number of results to return (1-20). Defaults to 20."
+        description="Number of results to return (1-20). Defaults to 20.",
     )
 
     offset: Optional[int] = Field(
         default=0,
         ge=0,
         le=9,
-        description="Zero-based pagination offset (0-9 pages). Defaults to 0."
+        description="Zero-based pagination offset (0-9 pages). Defaults to 0.",
     )
 
     spellcheck: Optional[bool] = Field(
         default=True,
-        description="Enable automatic query spelling correction. Defaults to True."
+        description="Enable automatic query spelling correction. Defaults to True.",
     )
 
     text_decorations: Optional[bool] = Field(
         default=True,
-        description="Include highlighting markers in display strings. Defaults to True."
+        description="Include highlighting markers in display strings. Defaults to True.",
     )
 
     freshness: Optional[Literal["pd", "pw", "pm", "py"]] = Field(
         default=None,
-        description="Filter by age. MUST be one of: 'pd' (past day), 'pw' (past week), 'pm' (past month), 'py' (past year). Invalid values rejected."
+        description="Filter by age. MUST be one of: 'pd' (past day), 'pw' (past week), 'pm' (past month), 'py' (past year). Invalid values rejected.",
     )
 
 
@@ -77,47 +77,47 @@ class SearchRequest(BaseSearchRequest):
 
     safesearch: Optional[Literal["off", "moderate", "strict"]] = Field(
         default="moderate",
-        description="Content filtering level: 'off', 'moderate' (default), or 'strict'."
+        description="Content filtering level: 'off', 'moderate' (default), or 'strict'.",
     )
 
     result_filter: Optional[str] = Field(
         default=None,
-        description="Comma-separated result types to filter by: 'discussions', 'faq', 'infobox', 'news', 'videos', 'images', etc. Leave empty to include all types."
+        description="Comma-separated result types to filter by: 'discussions', 'faq', 'infobox', 'news', 'videos', 'images', etc. Leave empty to include all types.",
     )
 
     units: Optional[Literal["imperial", "metric"]] = Field(
         default=None,
-        description="Measurement system for results: 'imperial' or 'metric'. Leave empty for system default."
+        description="Measurement system for results: 'imperial' or 'metric'. Leave empty for system default.",
     )
 
     goggles: Optional[str] = Field(
         default=None,
-        description="Custom re-ranking Goggle URL or definition (up to 3 supported). Used for custom result ranking logic."
+        description="Custom re-ranking Goggle URL or definition (up to 3 supported). Used for custom result ranking logic.",
     )
 
     extra_snippets: Optional[bool] = Field(
         default=False,
-        description="Retrieve additional alternative excerpts/snippets from each result. Defaults to False."
+        description="Retrieve additional alternative excerpts/snippets from each result. Defaults to False.",
     )
 
     summary: Optional[bool] = Field(
         default=False,
-        description="Enable AI-generated summary of top results. Defaults to False."
+        description="Enable AI-generated summary of top results. Defaults to False.",
     )
 
     enable_rich_callback: Optional[bool] = Field(
         default=False,
-        description="Enable real-time rich results via callback URL (advanced). Defaults to False."
+        description="Enable real-time rich results via callback URL (advanced). Defaults to False.",
     )
 
     include_fetch_metadata: Optional[bool] = Field(
         default=False,
-        description="Include fetch metadata in response (headers, response time, etc.). Defaults to False."
+        description="Include fetch metadata in response (headers, response time, etc.). Defaults to False.",
     )
 
     operators: Optional[bool] = Field(
         default=True,
-        description="Apply search operators to query (e.g., site:, filetype:). Defaults to True."
+        description="Apply search operators to query (e.g., site:, filetype:). Defaults to True.",
     )
 
 
@@ -150,7 +150,7 @@ class NewsSearchRequest(BaseSearchRequest):
 
     freshness: Optional[Literal["pd", "pw", "pm", "py"]] = Field(
         default="pw",
-        description="Filter by news age. MUST be one of: 'pd' (past day), 'pw' (past week, default), 'pm' (past month), 'py' (past year)."
+        description="Filter by news age. MUST be one of: 'pd' (past day), 'pw' (past week, default), 'pm' (past month), 'py' (past year).",
     )
 
 
@@ -207,7 +207,12 @@ def search_web(request: SearchRequest) -> SearchResponse:
         "X-Subscription-Token": api_key,
     }
 
-    logger.info("Executing web search", query=request.q, count=request.count, safesearch=request.safesearch)
+    logger.info(
+        "Executing web search",
+        query=request.q,
+        count=request.count,
+        safesearch=request.safesearch,
+    )
 
     try:
         with httpx.Client() as client:
@@ -215,7 +220,7 @@ def search_web(request: SearchRequest) -> SearchResponse:
                 "https://api.search.brave.com/res/v1/web/search",
                 params=params,
                 headers=headers,
-                timeout=10.0
+                timeout=10.0,
             )
             response.raise_for_status()
 
@@ -231,12 +236,14 @@ def search_web(request: SearchRequest) -> SearchResponse:
 
             for result in web_results:
                 if isinstance(result, dict):
-                    results.append(SearchResult(
-                        title=result.get("title", ""),
-                        url=result.get("url", ""),
-                        description=result.get("description", ""),
-                        source=result.get("type", "web")
-                    ))
+                    results.append(
+                        SearchResult(
+                            title=result.get("title", ""),
+                            url=result.get("url", ""),
+                            description=result.get("description", ""),
+                            source=result.get("type", "web"),
+                        )
+                    )
 
             logger.info("Search complete", query=request.q, result_count=len(results))
 
@@ -245,7 +252,7 @@ def search_web(request: SearchRequest) -> SearchResponse:
                 query=request.q,
                 count=len(results),
                 offset=request.offset,
-                took_ms=data.get("took_ms")
+                took_ms=data.get("took_ms"),
             )
 
     except httpx.HTTPError as e:
@@ -303,7 +310,7 @@ def search_news(request: NewsSearchRequest) -> SearchResponse:
                 "https://api.search.brave.com/res/v1/news/search",
                 params=params,
                 headers=headers,
-                timeout=10.0
+                timeout=10.0,
             )
             response.raise_for_status()
 
@@ -315,20 +322,28 @@ def search_news(request: NewsSearchRequest) -> SearchResponse:
 
             for result in news_results:
                 if isinstance(result, dict):
-                    results.append(SearchResult(
-                        title=result.get("title", ""),
-                        url=result.get("url", ""),
-                        description=result.get("description", ""),
-                        source=result.get("source", {}).get("name", "news") if isinstance(result.get("source"), dict) else result.get("source", "news")
-                    ))
+                    results.append(
+                        SearchResult(
+                            title=result.get("title", ""),
+                            url=result.get("url", ""),
+                            description=result.get("description", ""),
+                            source=(
+                                result.get("source", {}).get("name", "news")
+                                if isinstance(result.get("source"), dict)
+                                else result.get("source", "news")
+                            ),
+                        )
+                    )
 
-            logger.info("News search complete", query=request.q, result_count=len(results))
+            logger.info(
+                "News search complete", query=request.q, result_count=len(results)
+            )
 
             return SearchResponse(
                 results=results,
                 query=request.q,
                 count=len(results),
-                offset=request.offset
+                offset=request.offset,
             )
 
     except httpx.HTTPError as e:
@@ -346,12 +361,12 @@ if __name__ == "__main__":
 
     # Test news search
     logger.info("News search test started")
-    request = NewsSearchRequest(
-        q="artificial intelligence",
-        freshness="pw",
-        count=5
-    )
+    request = NewsSearchRequest(q="artificial intelligence", freshness="pw", count=5)
     response = search_news(request)
-    logger.info("News search complete", query=response.query, result_count=response.count)
+    logger.info(
+        "News search complete", query=response.query, result_count=response.count
+    )
     for result in response.results:
-        logger.info("News result", title=result.title, source=result.source, url=result.url)
+        logger.info(
+            "News result", title=result.title, source=result.source, url=result.url
+        )

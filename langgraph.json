@@ -1,0 +1,12 @@
+{
+  "graphs": {
+    "search_graph": {
+      "path": "search_graph:graph"
+    }
+  },
+  "source": {
+    "kind": "uv",
+    "root": "."
+  },
+  "env": ".env"
+}
