@@ -15,6 +15,7 @@ from langchain_core.messages import SystemMessage, ToolMessage
 from langsmith import traceable
 import json
 from datetime import datetime
+from langgraph.checkpoint.memory import MemorySaver
 
 from model_config import get_model
 from logging_config import setup_logging, get_logger
@@ -24,6 +25,7 @@ import os
 
 setup_logging()
 logger = get_logger(__name__)
+memory = MemorySaver()
 
 # Configure LangSmith from settings
 settings = Settings()
@@ -176,11 +178,14 @@ graph_builder = StateGraph(State)
 logger.info("Graph builder initialized")
 
 
-
-
 @traceable(name="agent_node")
 def agent(state: State):
     """Main agent node that processes messages and decides to search or respond"""
+    logger.info(
+        "Agent node invoked",
+        messages_count=len(state["messages"]),
+        search_results_count=len(state.get("search_results", [])),
+    )
     messages = state["messages"]
 
     # Inject date context if not already present
@@ -214,13 +219,34 @@ Use the appropriate search tool:
     model_with_tools = model.bind_tools(tools)
     response = model_with_tools.invoke(messages)
 
+    logger.info(
+        "LLM response",
+        response_type=type(response).__name__,
+        has_content=bool(getattr(response, "content", None)),
+    )
+    if hasattr(response, "content"):
+        logger.info("LLM content", content=response.content)
+
     has_tool_calls = hasattr(response, "tool_calls") and bool(response.tool_calls)
-    logger.info("Agent response", tool_calls=has_tool_calls, tool_calls_count=len(response.tool_calls) if hasattr(response, "tool_calls") else 0)
+    logger.info(
+        "Agent response",
+        tool_calls=has_tool_calls,
+        tool_calls_count=(
+            len(response.tool_calls) if hasattr(response, "tool_calls") else 0
+        ),
+    )
     if hasattr(response, "tool_calls") and response.tool_calls:
         for tool_call in response.tool_calls:
             tc_id = tool_call.get("id") if isinstance(tool_call, dict) else tool_call.id
-            tc_name = tool_call.get("name") if isinstance(tool_call, dict) else tool_call.name
-            logger.info("Tool call", id=tc_id, name=tc_name)
+            tc_name = (
+                tool_call.get("name") if isinstance(tool_call, dict) else tool_call.name
+            )
+            tc_args = (
+                tool_call.get("args")
+                if isinstance(tool_call, dict)
+                else getattr(tool_call, "args", {})
+            )
+            logger.info("Tool call", id=tc_id, name=tc_name, args=tc_args)
 
     return {"messages": [response]}
 
@@ -228,6 +254,11 @@ Use the appropriate search tool:
 @traceable(name="process_tool_result_node")
 def process_tool_result(state: State):
     """Extract search results from tool messages and populate state"""
+    logger.info(
+        "Process tool result node invoked",
+        messages_count=len(state["messages"]),
+        current_search_results=len(state.get("search_results", [])),
+    )
     messages = state["messages"]
     search_results = []
 
@@ -236,22 +267,41 @@ def process_tool_result(state: State):
             break
 
         try:
-            logger.info("Processing tool result", tool_call_id=msg.tool_call_id, tool_name=msg.name)
+            logger.info(
+                "Processing tool result",
+                tool_call_id=msg.tool_call_id,
+                tool_name=msg.name,
+            )
 
             if not msg.content or not msg.content.strip():
-                logger.debug("Empty tool result, skipping", tool_call_id=msg.tool_call_id)
+                logger.debug(
+                    "Empty tool result, skipping", tool_call_id=msg.tool_call_id
+                )
                 continue
 
             payload = json.loads(msg.content)
             if "error" in payload:
-                logger.error("Tool error in message", tool_call_id=msg.tool_call_id, error=payload["error"])
+                logger.error(
+                    "Tool error in message",
+                    tool_call_id=msg.tool_call_id,
+                    error=payload["error"],
+                )
                 continue
 
             if "results" in payload:
-                logger.info("Tool results extracted", tool_call_id=msg.tool_call_id, result_count=len(payload["results"]))
+                logger.info(
+                    "Tool results extracted",
+                    tool_call_id=msg.tool_call_id,
+                    result_count=len(payload["results"]),
+                )
                 search_results.extend(payload["results"])
         except (json.JSONDecodeError, TypeError, AttributeError) as e:
-            logger.error("Failed to parse tool result", tool_call_id=msg.tool_call_id, error=str(e), content=repr(msg.content) if hasattr(msg, 'content') else "N/A")
+            logger.error(
+                "Failed to parse tool result",
+                tool_call_id=msg.tool_call_id,
+                error=str(e),
+                content=repr(msg.content) if hasattr(msg, "content") else "N/A",
+            )
 
     return {"search_results": search_results}
 
@@ -261,82 +311,208 @@ graph_builder.add_node("agent", agent)
 graph_builder.add_node("tools", tool_node)
 graph_builder.add_node("process_tool_result", process_tool_result)
 
+
 # Add edges
 def log_routing(state: State):
     """Debug routing decisions"""
+    logger.info(
+        "Routing state",
+        messages_count=len(state["messages"]),
+        search_results_count=len(state.get("search_results", [])),
+    )
     if state["messages"]:
         last_msg = state["messages"][-1]
         has_calls = hasattr(last_msg, "tool_calls") and bool(last_msg.tool_calls)
-        logger.debug("Routing decision", has_tool_calls=has_calls, message_type=type(last_msg).__name__)
+        logger.debug(
+            "Routing decision",
+            has_tool_calls=has_calls,
+            message_type=type(last_msg).__name__,
+        )
 
+
+@traceable(name="tool_approval_node")
+def tool_approval_node(state: State):
+    """Show tool calls awaiting approval"""
+    last_msg = state["messages"][-1]
+    tool_calls = last_msg.tool_calls if hasattr(last_msg, "tool_calls") else []
+
+    # Format tool calls for review
+    tool_info = []
+    for tc in tool_calls:
+        tc_name = tc.get("name") if isinstance(tc, dict) else tc.name
+        tc_args = tc.get("args") if isinstance(tc, dict) else getattr(tc, "args", {})
+        tool_info.append({"name": tc_name, "args": tc_args})
+
+    logger.info(
+        "Interrupt: tool approval required",
+        tool_calls_count=len(tool_calls),
+        tools=[t["name"] for t in tool_info]
+    )
+
+    # Display tools for approval
+    print("\n" + "="*80)
+    print("TOOL APPROVAL REQUIRED (Execution paused)")
+    print("="*80)
+    for i, tool in enumerate(tool_info, 1):
+        print(f"\n{i}. Tool: {tool['name']}")
+        print(f"   Args: {tool['args']}")
+    print("\n" + "="*80)
+    print("Resume to approve, or rewind to reject.\n")
+
+    return {"messages": []}
+
+
+def route_after_agent(state: State) -> str:
+    """Route to approval or tools based on agent response"""
+    if not state["messages"]:
+        return END
+
+    last_msg = state["messages"][-1]
+    has_tool_calls = hasattr(last_msg, "tool_calls") and bool(last_msg.tool_calls)
+
+    if has_tool_calls:
+        return "tool_approval"
+
+    return END
+
+
+# Add nodes
+graph_builder.add_node("tool_approval", tool_approval_node)
+
+# Add edges
 graph_builder.add_edge(START, "agent")
 graph_builder.add_conditional_edges(
-    "agent", tools_condition, {"tools": "tools", "__end__": END}
+    "agent", route_after_agent, {"tool_approval": "tool_approval", "__end__": END}
 )
+graph_builder.add_edge("tool_approval", "tools")
 graph_builder.add_edge("tools", "process_tool_result")
 graph_builder.add_edge("process_tool_result", "agent")
 
-graph = graph_builder.compile()
+graph = graph_builder.compile(
+    checkpointer=memory,
+    name="search_graph",
+    interrupt_before=["tools"]
+)
+
+config = {
+    "configurable":{
+        "thread_id": "1"
+    }
+}
 
 logger.info("Search graph compiled successfully")
 
 
 if __name__ == "__main__":
-    logger.info("Starting search graph tests")
+    logger.info("Starting search graph with interrupt_before")
 
-    # Test 1: Simple search query
-    logger.info("Test 1: Simple Search Query")
-    user_query = "What are the latest developments in LLM reasoning?"
+    user_query = "What are the latest developments in LLM reasoning? I also need to know when was fable 5.1 released"
     logger.info("Query", query=user_query)
 
-    result = graph.invoke({"messages": [("user", user_query)]})
-    final_message = result["messages"][-1]
+    initial_input = {"messages": [("user", user_query)]}
 
-    if hasattr(final_message, "content"):
-        logger.info(
-            "Agent response received", response_length=len(final_message.content)
-        )
-        print(f"\n{'='*80}\nTest 1 Response:\n{'='*80}\n{final_message.content}\n{'='*80}")
+    while True:
+        logger.info("Invoking graph")
+        result = graph.invoke(initial_input, config=config)
 
-    # Test 2: Search with specific parameters
-    logger.info("Test 2: Filtered Search (Recent Results)")
-    user_query = "Tell me about quantum computing breakthroughs this week"
-    logger.info("Query", query=user_query)
+        # Get current state to check if interrupted
+        state = graph.get_state(config)
 
-    result = graph.invoke({"messages": [("user", user_query)]})
-    final_message = result["messages"][-1]
+        print(f"\nCurrent next node(s): {state.next}")
 
-    if hasattr(final_message, "content"):
-        logger.info(
-            "Agent response received", response_length=len(final_message.content)
-        )
-        print(f"\n{'='*80}\nTest 2 Response:\n{'='*80}\n{final_message.content}\n{'='*80}")
+        if state.next and state.next[0] == "tools":
+            # Execution paused before tools
+            print("\n" + "="*80)
+            print("EXECUTION PAUSED BEFORE TOOLS")
+            print("="*80)
 
-    # Test 3: Multi-turn conversation
-    logger.info("Test 3: Multi-turn Conversation")
-    messages = [
-        ("user", "Search for Python async programming best practices"),
-        (
-            "assistant",
-            "I'll search for Python async programming best practices for you.",
-        ),
-    ]
+            last_msg = result["messages"][-1]
+            if hasattr(last_msg, "tool_calls"):
+                for i, tc in enumerate(last_msg.tool_calls, 1):
+                    tc_name = tc.get("name") if isinstance(tc, dict) else tc.name
+                    tc_args = tc.get("args") if isinstance(tc, dict) else getattr(tc, "args", {})
+                    print(f"\n{i}. {tc_name}")
+                    print(f"   Args: {tc_args}")
 
-    logger.info("Starting multi-turn conversation")
-    result = graph.invoke({"messages": messages})
+            approval = input("\nApprove tool execution? (yes/no): ").strip().lower()
 
-    if result["messages"]:
+            if approval in ["yes", "y"]:
+                logger.info("User approved - resuming")
+                initial_input = None
+                continue
+            else:
+                logger.info("User rejected - aborting")
+                break
+
+        # Execution completed (no more interrupts)
+        print("\n" + "="*80)
+        print("EXECUTION COMPLETE")
+        print("="*80 + "\n")
+
         final_message = result["messages"][-1]
         if hasattr(final_message, "content"):
             logger.info(
-                "Multi-turn conversation complete",
-                response_length=len(final_message.content),
+                "Agent response received",
+                response_length=len(final_message.content)
             )
-            print(f"\n{'='*80}\nTest 3 Response:\n{'='*80}\n{final_message.content}\n{'='*80}")
+            print(f"Agent Response:\n{final_message.content}\n")
+
+        # Show checkpoint history
+        print("\n" + "="*80)
+        print("CHECKPOINT HISTORY")
+        print("="*80 + "\n")
+
+        checkpoints = list(graph.get_state_history(config))
+        for i, checkpoint in enumerate(checkpoints):
+            print(f"Checkpoint {i}:")
+            print(f"  Next: {checkpoint.next}")
+            print(f"  Messages: {len(checkpoint.values.get('messages', []))}")
+            print(f"  Search results: {len(checkpoint.values.get('search_results', []))}")
+            print()
+
+        break
+
+    # # Test 2: Search with specific parameters
+    # logger.info("Test 2: Filtered Search (Recent Results)")
+    # user_query = "Tell me about quantum computing breakthroughs this week"
+    # logger.info("Query", query=user_query)
+
+    # result = graph.invoke({"messages": [("user", user_query)]})
+    # final_message = result["messages"][-1]
+
+    # if hasattr(final_message, "content"):
+    #     logger.info(
+    #         "Agent response received", response_length=len(final_message.content)
+    #     )
+    #     print(f"\n{'='*80}\nTest 2 Response:\n{'='*80}\n{final_message.content}\n{'='*80}")
+
+    # # Test 3: Multi-turn conversation
+    # logger.info("Test 3: Multi-turn Conversation")
+    # messages = [
+    #     ("user", "Search for Python async programming best practices"),
+    #     (
+    #         "assistant",
+    #         "I'll search for Python async programming best practices for you.",
+    #     ),
+    # ]
+
+    # logger.info("Starting multi-turn conversation")
+    # result = graph.invoke({"messages": messages})
+
+    # if result["messages"]:
+    #     final_message = result["messages"][-1]
+    #     if hasattr(final_message, "content"):
+    #         logger.info(
+    #             "Multi-turn conversation complete",
+    #             response_length=len(final_message.content),
+    #         )
+    #         print(
+    #             f"\n{'='*80}\nTest 3 Response:\n{'='*80}\n{final_message.content}\n{'='*80}"
+    #         )
 
 try:
     png_bytes = graph.get_graph().draw_mermaid_png()
-    with open("graph.png","wb") as f:
+    with open("graph.png", "wb") as f:
         f.write(png_bytes)
 except Exception as e:
     print("Error displaying graph:", e)
