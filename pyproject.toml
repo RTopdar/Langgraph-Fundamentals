@@ -8,9 +8,11 @@ dependencies = [
     "black>=26.5.1",
     "ipython>=9.17.1",
     "langchain-openrouter>=0.2.8",
+    "langchain-typesafe>=0.0.1a3",
     "langgraph>=1.2.11",
     "langgraph-cli[inmem]>=0.4.31",
     "langgraph-sdk>=0.1.0",
     "pydantic-settings>=2.15.0",
     "structlog>=24.1.0,<26",
+    "tenacity>=9.1.4",
 ]

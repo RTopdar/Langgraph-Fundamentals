@@ -1,5 +1,8 @@
+from pathlib import Path
 from pydantic_settings import BaseSettings, SettingsConfigDict
 from typing import Optional
+
+PROJECT_ROOT = Path(__file__).resolve().parent
 
 
 class Settings(BaseSettings):
@@ -20,12 +23,15 @@ class Settings(BaseSettings):
     langsmith_api_key: Optional[str] = None
     langsmith_project: str = "langgraph-learn"
 
+    # TypeSafe Configuration
+    typesafe_api_key: Optional[str] = None
+
     # Application
     log_level: str = "INFO"
     app_name: str = "langgraph-learn"
 
     model_config = SettingsConfigDict(
-        env_file=".env",
+        env_file=PROJECT_ROOT / ".env",
         env_file_encoding="utf-8",
         case_sensitive=False,
     )
