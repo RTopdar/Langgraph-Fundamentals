@@ -19,7 +19,12 @@ from langgraph.checkpoint.memory import MemorySaver
 
 from model_config import get_model
 from logging_config import setup_logging, get_logger
-from search_tool import search_web, search_news, SearchRequest, NewsSearchRequest
+from dummies.search_tool import (
+    search_web,
+    search_news,
+    SearchRequest,
+    NewsSearchRequest,
+)
 from settings import Settings
 import os
 
@@ -346,17 +351,17 @@ def tool_approval_node(state: State):
     logger.info(
         "Interrupt: tool approval required",
         tool_calls_count=len(tool_calls),
-        tools=[t["name"] for t in tool_info]
+        tools=[t["name"] for t in tool_info],
     )
 
     # Display tools for approval
-    print("\n" + "="*80)
+    print("\n" + "=" * 80)
     print("TOOL APPROVAL REQUIRED (Execution paused)")
-    print("="*80)
+    print("=" * 80)
     for i, tool in enumerate(tool_info, 1):
         print(f"\n{i}. Tool: {tool['name']}")
         print(f"   Args: {tool['args']}")
-    print("\n" + "="*80)
+    print("\n" + "=" * 80)
     print("Resume to approve, or rewind to reject.\n")
 
     return {"messages": []}
@@ -389,16 +394,10 @@ graph_builder.add_edge("tools", "process_tool_result")
 graph_builder.add_edge("process_tool_result", "agent")
 
 graph = graph_builder.compile(
-    checkpointer=memory,
-    name="search_graph",
-    interrupt_before=["tools"]
+    checkpointer=memory, name="search_graph", interrupt_before=["tools"]
 )
 
-config = {
-    "configurable":{
-        "thread_id": "1"
-    }
-}
+config = {"configurable": {"thread_id": "1"}}
 
 logger.info("Search graph compiled successfully")
 
@@ -422,15 +421,19 @@ if __name__ == "__main__":
 
         if state.next and state.next[0] == "tools":
             # Execution paused before tools
-            print("\n" + "="*80)
+            print("\n" + "=" * 80)
             print("EXECUTION PAUSED BEFORE TOOLS")
-            print("="*80)
+            print("=" * 80)
 
             last_msg = result["messages"][-1]
             if hasattr(last_msg, "tool_calls"):
                 for i, tc in enumerate(last_msg.tool_calls, 1):
                     tc_name = tc.get("name") if isinstance(tc, dict) else tc.name
-                    tc_args = tc.get("args") if isinstance(tc, dict) else getattr(tc, "args", {})
+                    tc_args = (
+                        tc.get("args")
+                        if isinstance(tc, dict)
+                        else getattr(tc, "args", {})
+                    )
                     print(f"\n{i}. {tc_name}")
                     print(f"   Args: {tc_args}")
 
@@ -445,29 +448,30 @@ if __name__ == "__main__":
                 break
 
         # Execution completed (no more interrupts)
-        print("\n" + "="*80)
+        print("\n" + "=" * 80)
         print("EXECUTION COMPLETE")
-        print("="*80 + "\n")
+        print("=" * 80 + "\n")
 
         final_message = result["messages"][-1]
         if hasattr(final_message, "content"):
             logger.info(
-                "Agent response received",
-                response_length=len(final_message.content)
+                "Agent response received", response_length=len(final_message.content)
             )
             print(f"Agent Response:\n{final_message.content}\n")
 
         # Show checkpoint history
-        print("\n" + "="*80)
+        print("\n" + "=" * 80)
         print("CHECKPOINT HISTORY")
-        print("="*80 + "\n")
+        print("=" * 80 + "\n")
 
         checkpoints = list(graph.get_state_history(config))
         for i, checkpoint in enumerate(checkpoints):
             print(f"Checkpoint {i}:")
             print(f"  Next: {checkpoint.next}")
             print(f"  Messages: {len(checkpoint.values.get('messages', []))}")
-            print(f"  Search results: {len(checkpoint.values.get('search_results', []))}")
+            print(
+                f"  Search results: {len(checkpoint.values.get('search_results', []))}"
+            )
             print()
 
         break
