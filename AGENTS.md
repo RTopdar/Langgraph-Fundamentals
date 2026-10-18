@@ -49,6 +49,11 @@ These rules apply to any AI coding agent working in this repo (Claude Code, Curs
 - When code changes introduce new modules, services, major decisions, or agents, delegate to the `doc-sync` subagent (`.claude/agents/doc-sync.md`) to scan diffs and update docs.
 - **Self-healing scope**: doc-sync updates `IMPLEMENTATION_PLAN.md` and `doc/feature/*.md`. It does not touch `doc/bug/` — that subtree is owned exclusively by `incident-handler`.
 
+## 4a. Agent Skills (inferred from code)
+
+- Skills are installed under `.agents/skills/<name>/` and exposed to Claude Code via symlinks in `.claude/skills/<name>` → `../../.agents/skills/<name>`. Versions are pinned in `skills-lock.json` (commit `1f3102f`).
+- Currently `.agents/skills/` is empty in the checkout, so the symlinks dangle. Do not hand-edit `skills-lock.json`; flagged in `IMPLEMENTATION_PLAN.md` Open Decisions.
+
 ## 5. Knowledge Graph Before Code (optional — requires a knowledge-graph tool)
 
 If a knowledge-graph tool (e.g. `graphify`) is available in your platform:

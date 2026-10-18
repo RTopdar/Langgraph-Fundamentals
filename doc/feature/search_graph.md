@@ -2,14 +2,16 @@
 type: Module
 title: Search Graph
 description: Tool-calling LangGraph agent that can call Brave web/news search and reason over results.
-resource: search_graph.py
+resource: dummies/search_graph.py
 tags: [langgraph, agent, search, tools]
 status: stable
 ---
 
 # Search Graph
 
-`search_graph.py` is the main search-capable agent in this repo, and the one graph registered in `langgraph.json` (as `search_graph`) for `langgraph dev`/Studio.
+`dummies/search_graph.py` is the main search-capable agent in this repo. It was moved from the repo root into `dummies/` in commit `8e48c33` and imports `dummies.search_tool`, so run it from the repo root.
+
+**Drift:** `langgraph.json` still maps `search_graph` → `search_graph:graph`, which no longer resolves. Until that is fixed (see IMPLEMENTATION_PLAN.md Open Decisions), `langgraph dev` will not load this graph.
 
 ## State
 
@@ -34,6 +36,8 @@ START -> agent -(tools_condition)-> tools -> process_tool_result -> agent -> ...
 - **`tools`** — a prebuilt `ToolNode` executing whichever tool(s) the model called.
 - **`process_tool_result`** — walks trailing `ToolMessage`s, parses their JSON content, and collects `results` into `state["search_results"]` (skips empty content, logs and skips entries with an `"error"` key or malformed JSON).
 
+Checkpointing uses `MemorySaver`, with `interrupt_before=["tools"]` for human-in-the-loop approval of tool calls.
+
 LangSmith tracing is enabled here independently of `main.py`, directly from `Settings()` at module import time.
 
-The `__main__` block runs three manual smoke tests (simple query, freshness-filtered query, multi-turn conversation) and, on success, writes `graph.png` via `draw_mermaid_png()`.
+The `__main__` block runs three manual smoke tests (simple query, freshness-filtered query, multi-turn conversation) and, on success, writes `graph.png` via `draw_mermaid_png()` to the current working directory.

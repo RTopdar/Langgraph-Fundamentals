@@ -2,7 +2,7 @@
 type: Module
 title: Brave Search Tool
 description: Custom Brave Search API client (web + news) with Pydantic request/response models.
-resource: search_tool.py
+resource: dummies/search_tool.py
 tags: [search, brave-api, pydantic]
 status: stable
 ---
@@ -23,6 +23,6 @@ status: stable
 - **`search_web(request: SearchRequest) -> SearchResponse`** — GETs `https://api.search.brave.com/res/v1/web/search` with `request.model_dump(exclude_none=True)` as query params and `X-Subscription-Token` from `Settings().brave_search_api_key`. Parses the `web` section of the response (handles both list and `{"results": [...]}` shapes).
 - **`search_news(request: NewsSearchRequest) -> SearchResponse`** — GETs `.../news/search`, parses the top-level `results` list, extracting `source.name` when source is a dict.
 
-Both raise `ValueError` if `brave_search_api_key` is unset, and wrap `httpx.HTTPError` into `ValueError` on API failure. Consumed by [`search_graph.py`](/doc/feature/search_graph.md)'s `web_search`/`news_search` LangChain tools.
+Both raise `ValueError` if `brave_search_api_key` is unset, and wrap `httpx.HTTPError` into `ValueError` on API failure. Moved from the repo root to `dummies/` in commit `8e48c33`. Consumed by [`dummies/search_graph.py`](/doc/feature/search_graph.md)'s `web_search`/`news_search` LangChain tools.
 
 The `__main__` block runs both functions against live queries as a manual smoke test, logging via [`logging_config`](/doc/feature/logging_config.md) (no `print()`, per the logging cleanup commit).
